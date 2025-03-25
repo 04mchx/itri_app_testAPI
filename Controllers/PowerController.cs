@@ -133,6 +133,25 @@ namespace testAPI.Controllers
 
             return Ok(result);
         }
+        [HttpGet("demand-chart")]
+        public async Task<IActionResult> GetDailyDemandChart()
+        {
+            var today = DateTime.Today;
+            var now = DateTime.Now;
+
+            var data = await _context.PMMinP
+                .Where(p => p.Date_time >= today && p.Date_time <= now)
+                .OrderBy(p => p.Date_time)
+                .Select(p => new
+                {
+                    Time = p.Date_time.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Demand = Math.Round(p.kW ?? 0, 2)
+                })
+                .ToListAsync();
+
+            return Ok(data);
+        }
+
         // 獲取本日/本月的總用電數據
         [HttpGet("summary")]
         public async Task<ActionResult<object>> GetPowerSummary([FromQuery] string type)
