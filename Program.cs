@@ -3,35 +3,29 @@ using testAPI.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+// 加入 Swagger 服務
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 // 讀取 appsettings.json 內的連線字串
 builder.Services.AddDbContext<PowerDbContext>(options =>
     options.UseSqlServer(builder.Configuration["DefaultConnection"]));
 
-// Add services to the container.
+// 加入 Controller 和 JSON 命名設定
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = null; // 保持 JSON 格式的大小寫
     });
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// 不管是開發還是部署環境都啟用 Swagger
+app.UseSwagger();
+app.UseSwaggerUI(); // 會在 /swagger 顯示介面
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
