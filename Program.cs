@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 讀取 appsettings.json 內的連線字串
 builder.Services.AddDbContext<PowerDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("itri_APP")));
+    options.UseSqlServer(builder.Configuration["DefaultConnection"]));
 
 // Add services to the container.
 builder.Services.AddControllers()
