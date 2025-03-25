@@ -11,6 +11,8 @@ namespace testAPI.Models
         public int? UnLoad { get; set; }
         public int? Control { get; set; }
         public int? RunStatus { get; set; }
+        //public int? Temperature { get; set; }
+
     }
 }
 

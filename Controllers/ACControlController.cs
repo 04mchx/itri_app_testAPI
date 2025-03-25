@@ -21,7 +21,7 @@ namespace testAPI.Controllers
 
         // 控制單台空調（避免重複關機）
         [HttpPost("control")]
-        public async Task<IActionResult> ControlAC([FromQuery] string floor, [FromQuery] int ac_id, [FromQuery] int control)
+        public async Task<IActionResult> ControlAC([FromQuery] string floor, [FromQuery] int ac_id, [FromQuery] int control, [FromQuery]int ?temp)
         {
             // 驗證樓層參數
             if (floor != "1F" && floor != "2F")
@@ -30,6 +30,13 @@ namespace testAPI.Controllers
             // 驗證開關參數（0: 關，1: 開）
             if (control != 0 && control != 1)
                 return BadRequest("Invalid control value. Use '0' (Off) or '1' (On).");
+            
+            //Temperature = temperature,
+
+            // 溫度處理（可為 null，預設 24）
+            int temperature = temp ?? 24;
+            if (temperature < 23 || temperature > 28)
+                return BadRequest("Temperature must be between 23 and 28°C.");
 
             DateTime now = DateTime.Now;
 
