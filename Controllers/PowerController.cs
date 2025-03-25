@@ -19,57 +19,120 @@ namespace testAPI.Controllers
             _context = context;
         }
 
-        // 總用電量的折線圖
-        [HttpGet("total")]
-        public async Task<ActionResult<IEnumerable<object>>> GetTotalPower()
+        // 本日每小時 / 本月每日 用電柱狀圖（若該時間無資料則補下一筆）
+        [HttpGet("total-chart")]
+        public async Task<IActionResult> GetTotalPowerChart([FromQuery] string type)
         {
-            var result = await _context.PMMinP
-                .OrderBy(p => p.Date_time) // 按時間排序
-                .Select(p => new
+            if (type != "daily" && type != "monthly")
+                return BadRequest("Invalid type. Use 'daily' or 'monthly'.");
+
+            var now = DateTime.Now;
+            var result = new List<object>();
+
+            if (type == "daily")
+            {
+                DateTime start = DateTime.Today;
+                DateTime end = now;
+
+                var data = await _context.PMMinP
+                    .Where(p => p.Date_time >= start && p.Date_time <= end)
+                    .OrderBy(p => p.Date_time)
+                    .ToListAsync();
+
+                for (int hour = 0; hour < 24; hour++)
                 {
-                    Date = p.Date_time,
-                    TotalPower = p.kWh
-                })
-                .ToListAsync();
+                    var segmentStart = start.AddHours(hour);
+                    var segmentEnd = segmentStart.AddHours(1);
+
+                    var segmentData = data
+                        .Where(p => p.Date_time >= segmentStart && p.Date_time < segmentEnd)
+                        .ToList();
+
+                    if (segmentData.Any())
+                    {
+                        var power = segmentData.Sum(p => p.kWh);
+                        result.Add(new
+                        {
+                            Time = segmentStart.ToString("yyyy-MM-dd HH:mm:ss"),
+                            Power = Math.Round(power.GetValueOrDefault(), 2)
+                        });
+                    }
+                    else
+                    {
+                        var fallback = data.FirstOrDefault(p => p.Date_time > segmentStart);
+                        if (fallback != null)
+                        {
+                            result.Add(new
+                            {
+                                Time = segmentStart.ToString("yyyy-MM-dd HH:mm:ss"),
+                                Power = Math.Round(fallback.kWh ?? 0, 2)
+                            });
+                        }
+                        else
+                        {
+                            result.Add(new
+                            {
+                                Time = segmentStart.ToString("yyyy-MM-dd HH:mm:ss"),
+                                Power = 0.0
+                            });
+                        }
+                    }
+                }
+            }
+            else if (type == "monthly")
+            {
+                DateTime start = new DateTime(now.Year, now.Month, 1);
+                int daysInMonth = DateTime.DaysInMonth(now.Year, now.Month);
+                DateTime end = now;
+
+                var data = await _context.PMMinP
+                    .Where(p => p.Date_time >= start && p.Date_time <= end)
+                    .OrderBy(p => p.Date_time)
+                    .ToListAsync();
+
+                for (int i = 0; i < daysInMonth; i++)
+                {
+                    var dayStart = start.AddDays(i);
+                    var dayEnd = dayStart.AddDays(1);
+
+                    var dayData = data
+                        .Where(p => p.Date_time >= dayStart && p.Date_time < dayEnd)
+                        .ToList();
+
+                    if (dayData.Any())
+                    {
+                        var power = dayData.Sum(p => p.kWh);
+                        result.Add(new
+                        {
+                            Time = dayStart.ToString("yyyy-MM-dd"),
+                            Power = Math.Round(power.GetValueOrDefault(), 2)
+                        });
+                    }
+                    else
+                    {
+                        var fallback = data.FirstOrDefault(p => p.Date_time > dayStart);
+                        if (fallback != null)
+                        {
+                            result.Add(new
+                            {
+                                Time = dayStart.ToString("yyyy-MM-dd"),
+                                Power = Math.Round(fallback.kWh ?? 0, 2)
+                            });
+                        }
+                        else
+                        {
+                            result.Add(new
+                            {
+                                Time = dayStart.ToString("yyyy-MM-dd"),
+                                Power = 0.0
+                            });
+                        }
+                    }
+                }
+            }
 
             return Ok(result);
         }
-
-        // 空調 & 照明的折線圖
-        [HttpGet("ac-light")]
-        public async Task<ActionResult<IEnumerable<object>>> GetAcLightPower()
-        {
-            var acPower = await _context.ACControl
-                .GroupBy(a => a.Date_Time)
-                .Select(g => new
-                {
-                    Date = g.Key,
-                    AC_Power = g.Sum(a => a.RunStatus) // 這裡假設 RunStatus 代表開啟的功率
-                })
-                .ToListAsync();
-
-            var lightPower = await _context.LightControl
-                .GroupBy(l => l.Date_Time)
-                .Select(g => new
-                {
-                    Date = g.Key,
-                    Light_Power = g.Sum(l => l.RunStatus) // 假設 RunStatus 代表照明功率
-                })
-                .ToListAsync();
-
-            var mergedData = acPower.Join(lightPower,
-                ac => ac.Date,
-                light => light.Date,
-                (ac, light) => new
-                {
-                    Date = ac.Date,
-                    AC_Power = ac.AC_Power,
-                    Light_Power = light.Light_Power
-                }).ToList();
-
-            return Ok(mergedData);
-        }
-
         // 獲取本日/本月的總用電數據
         [HttpGet("summary")]
         public async Task<ActionResult<object>> GetPowerSummary([FromQuery] string type)
